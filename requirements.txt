@@ -1,0 +1,50 @@
+# GenAI Multi-Agent Recruiting Chatbot - pinned dependencies.
+#
+# Verified to install AND import on Python 3.14 (the interpreter on this
+# machine). Versions follow the course Materials, adjusted only where a
+# lecture pin lacked Python 3.14 wheels or failed to import on 3.14.
+#
+# Install:  pip install -r requirements.txt
+
+# --- LangChain: agents, memory, tools (course lecture 21, 1.x line) ---
+# The 0.3.x line does not import on Python 3.14 (pydantic/typing bug), so we
+# use the 1.x line, which the course itself ran on 3.14. In 1.x the legacy
+# AgentExecutor / create_tool_calling_agent API lives in langchain-classic.
+langchain==1.2.0
+langchain-core==1.4.9
+langchain-classic==1.0.0
+langchain-openai==1.1.6
+langchain-community==0.4.1
+langchain-text-splitters==1.1.2
+# langgraph is pulled in by langchain; these exact pins keep the agent
+# imports working on 3.14 (newer langgraph breaks langchain 1.2.0).
+langgraph==1.0.10
+langgraph-prebuilt==1.0.13
+langgraph-sdk==0.3.15
+
+# --- OpenAI SDK (chat completions + embeddings) ---
+openai==2.45.0
+
+# --- RAG: vector store, PDF loading, env (course lecture 22) ---
+chromadb==1.5.9
+PyPDF2==3.0.1
+python-dotenv==1.1.0
+
+# --- Scheduling DB access via SQLAlchemy (course lecture 18 idiom) ---
+SQLAlchemy==2.0.51
+
+# --- Streamlit proof-of-concept UI (course lecture 23) ---
+streamlit==1.59.1
+
+# --- Data + evaluation: Accuracy, Confusion Matrix (course lectures 23-24) ---
+pandas==3.0.3
+numpy==2.5.1
+scikit-learn==1.9.0
+seaborn==0.13.2
+matplotlib==3.11.0
+tiktoken==0.13.0
+
+# --- Testing + notebook execution ---
+pytest==9.1.1
+ipykernel==7.3.0
+notebook==7.6.0
