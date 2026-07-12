@@ -14,6 +14,7 @@ def test_packages_import():
         "app.main",
         "app.modules",
         "app.modules.config",
+        "app.modules.data_exploration",
         "app.modules.embedding",
         "app.modules.scheduling_tool",
         "app.modules.main_agent",
