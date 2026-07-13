@@ -173,7 +173,10 @@ def find_interview_slots(date_expression: str, reference_date: str) -> str:
         reference_date: The conversation date in ISO format (YYYY-MM-DD). Used to
             resolve relative expressions such as "next Friday".
     """
-    reference = date.fromisoformat(reference_date)
+    try:
+        reference = date.fromisoformat(reference_date)
+    except (ValueError, TypeError):
+        reference = date.today()  # fall back if the caller passed a bad date
     target = resolve_date_expression(date_expression, reference)
     slots = get_nearest_available_slots(target, position=DEFAULT_POSITION, n=3)
     if not slots:
