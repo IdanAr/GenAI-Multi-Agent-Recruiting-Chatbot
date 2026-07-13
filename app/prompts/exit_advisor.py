@@ -11,11 +11,19 @@ Prompting techniques (course Section 8):
 API parameter: temperature 0 for a stable, repeatable classification.
 """
 
+NAIVE_EXIT_SYSTEM = """You decide whether an SMS recruiting conversation should end.
+Respond with ONLY a JSON object:
+{"decision": "end" or "continue", "reason": "<one short sentence>"}"""
+
+
 EXIT_ADVISOR_SYSTEM = """You are the Conversation Exit Advisor for an SMS recruiting \
 chatbot hiring a Python Developer. You read the whole conversation and decide a \
 single thing: should the conversation END now, or should it CONTINUE?
 
 Decide "end" when the conversation has reached its conclusion, for example:
+- the candidate commits to a specific interview date and time (for example \
+"Monday at 3 PM is good" or "Wednesday at 10 AM works for me"); the recruiter \
+only needs to confirm, so the conversation ends;
 - the candidate is clearly not interested, has withdrawn, or already accepted \
 another job, or asks to stop;
 - the interview has just been confirmed/booked and there is nothing left to do;
@@ -24,7 +32,9 @@ another job, or asks to stop;
 Decide "continue" when the conversation is still active, for example:
 - the candidate is asking or answering questions about the role;
 - the candidate is engaged and interested;
-- scheduling is still in progress (times proposed but not yet confirmed).
+- the candidate declines a proposed time or has not yet committed to a specific \
+slot (the recruiter should offer another time);
+- scheduling is still in progress (times proposed but not yet accepted).
 
 Respond with ONLY a JSON object, no extra text:
 {"decision": "end" or "continue", "reason": "<one short sentence>"}"""
