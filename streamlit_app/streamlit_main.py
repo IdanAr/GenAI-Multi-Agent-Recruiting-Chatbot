@@ -20,9 +20,33 @@ if _PROJECT_ROOT not in sys.path:
 import streamlit as st
 from dotenv import load_dotenv
 
+from app.modules import config, embedding
 from app.modules.main_agent import MainAgent
 
 load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
+
+# On Streamlit Community Cloud there is no .env; the API key is provided through
+# st.secrets. Bridge it into the environment so os.getenv keeps working. (This
+# does not override an existing .env value locally.)
+try:
+    if "OPENAI_API_KEY" in st.secrets and not os.getenv("OPENAI_API_KEY"):
+        os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+except Exception:
+    pass  # no secrets configured (e.g. local run without a secrets file)
+
+
+@st.cache_resource(show_spinner="Preparing the knowledge base...")
+def _prepare_backend():
+    """Build the Chroma collection and SQLite DB once if they are missing.
+
+    Cached so it runs a single time per server (important on a fresh Cloud
+    deploy where data/chroma/ is git-ignored and must be rebuilt).
+    """
+    embedding.ensure_collection()
+    if not config.SQLITE_DB_PATH.exists():
+        from app.modules.scheduling_tool import build_schedule_db
+        build_schedule_db()
+    return True
 
 st.set_page_config(page_title="Python Developer Recruiting Chatbot", page_icon="🐍")
 
@@ -118,8 +142,14 @@ def main() -> None:
                  "It answers questions, schedules interviews, or politely ends "
                  "the conversation.")
         st.button("Reset conversation", on_click=_reset)
-        if not os.getenv("OPENAI_API_KEY"):
-            st.warning("OPENAI_API_KEY is not set. Add it to .env to enable the bot.")
+
+    if not os.getenv("OPENAI_API_KEY"):
+        st.warning("OPENAI_API_KEY is not set. Add it to .env (local) or to the "
+                   "app secrets (Streamlit Cloud) to enable the bot.")
+        return
+
+    # Build the vector store / scheduling DB once if they are missing.
+    _prepare_backend()
 
     if not st.session_state.get("registered"):
         _register_view()

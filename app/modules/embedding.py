@@ -83,6 +83,20 @@ def get_collection():
         name=config.CHROMA_COLLECTION)
 
 
+def ensure_collection():
+    """Return the collection, building it first if it is empty.
+
+    Useful on a fresh deploy (for example Streamlit Community Cloud) where the
+    git-ignored data/chroma/ store does not exist yet: the collection is rebuilt
+    once from the committed job-description PDF.
+    """
+    collection = get_collection()
+    if collection.count() == 0:
+        build_collection()
+        collection = get_collection()
+    return collection
+
+
 def build_collection(pdf_path=config.JOB_DESCRIPTION_PDF,
                      chunk_size: int = 500, overlap: int = 100) -> dict:
     """Build (or rebuild) the Chroma collection from the job-description PDF.
