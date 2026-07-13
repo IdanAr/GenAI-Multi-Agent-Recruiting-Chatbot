@@ -37,11 +37,11 @@ def test_agreement_triggers_scheduling():
 
 
 @pytest.mark.skipif(not _HAS_KEY, reason="requires OPENAI_API_KEY")
-def test_role_question_does_not_schedule():
-    """A pure role question should not trigger scheduling."""
+def test_not_interested_does_not_schedule():
+    """A candidate who declines the opportunity should not trigger scheduling."""
     history = [
-        {"speaker": "recruiter", "text": "Thanks for applying to the Python Developer role."},
-        {"speaker": "candidate", "text": "What databases does the team use?"},
+        {"speaker": "recruiter", "text": "Would you like to interview for the Python Developer role?"},
+        {"speaker": "candidate", "text": "No thanks, I already accepted another offer."},
     ]
     result = scheduling_advisor.run_scheduling_advisor(history, reference_date="2024-04-03")
     assert result["should_schedule"] is False

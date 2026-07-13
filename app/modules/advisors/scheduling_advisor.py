@@ -19,11 +19,14 @@ from datetime import date
 # langchain 1.x: the classic agent API lives in langchain_classic (see the
 # note in info_advisor.py).
 from langchain_classic.agents import create_tool_calling_agent, AgentExecutor
+from langchain_core.messages import SystemMessage
+from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from app.modules.advisors.common import get_chat_llm, format_conversation
 from app.modules.scheduling_tool import find_interview_slots
-from app.prompts.scheduling_advisor import SCHEDULING_ADVISOR_SYSTEM
+from app.prompts.scheduling_advisor import (SCHEDULING_ADVISOR_SYSTEM,
+                                            SCHED_PLAN_SYSTEM)
 
 # Temperature 0: scheduling should be precise and consistent.
 _TEMPERATURE = 0.0
@@ -48,6 +51,29 @@ def build_scheduling_advisor(llm=None) -> AgentExecutor:
     )
 
 
+def _plan_scheduling(history, llm=None) -> dict:
+    """One planning call: whether to skip scheduling, and the date preference.
+
+    Returns {"skip": bool, "date_expression": str}. The agent-based tool-calling
+    approach was unreliable at proactively proposing times, so scheduling is
+    driven deterministically from this plan instead.
+    """
+    llm = llm or get_chat_llm(temperature=_TEMPERATURE)
+    prompt = ChatPromptTemplate.from_messages([
+        SystemMessage(content=SCHED_PLAN_SYSTEM),
+        ("user", "Conversation:\n{input}\n\nReturn only the JSON."),
+    ])
+    chain = prompt | llm | JsonOutputParser()
+    try:
+        raw = chain.invoke({"input": format_conversation(history)})
+        return {
+            "skip": bool(raw.get("skip", False)),
+            "date_expression": str(raw.get("date_expression", "") or ""),
+        }
+    except Exception:
+        return {"skip": False, "date_expression": ""}
+
+
 def run_scheduling_advisor(history, reference_date: str = None, llm=None) -> dict:
     """Run the Scheduling Advisor on a conversation and return its decision.
 
@@ -58,17 +84,23 @@ def run_scheduling_advisor(history, reference_date: str = None, llm=None) -> dic
 
     Returns:
         {"should_schedule": bool, "answer": str, "slots": list[str]}
-        should_schedule is True when the advisor chose to look up slots.
+        should_schedule is True unless the candidate declined or already committed.
     """
     reference_date = reference_date or date.today().isoformat()
-    conversation = format_conversation(history)
-    executor = build_scheduling_advisor(llm)
-    result = executor.invoke({"input": conversation, "reference_date": reference_date})
+    plan = _plan_scheduling(history, llm=llm)
 
-    steps = result.get("intermediate_steps", [])
-    slots = [observation for (_action, observation) in steps]
-    return {
-        "should_schedule": len(steps) > 0,
-        "answer": result["output"],
-        "slots": slots,
-    }
+    if plan["skip"]:
+        return {
+            "should_schedule": False,
+            "answer": "No problem - just let me know if there is anything else I can help with.",
+            "slots": [],
+        }
+
+    # Propose times using the Phase 3 function-calling tool.
+    slot_str = find_interview_slots.invoke({
+        "date_expression": plan["date_expression"],
+        "reference_date": reference_date,
+    })
+    reply = (f"Let's get your interview booked. {slot_str} "
+             "Which time works best for you?")
+    return {"should_schedule": True, "answer": reply, "slots": [slot_str]}

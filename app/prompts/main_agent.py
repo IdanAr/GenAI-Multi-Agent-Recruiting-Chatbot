@@ -16,13 +16,19 @@ they ACCEPT/commit to an interview time (for example "Monday at 3 PM is good", \
   * the candidate is not interested, declines the opportunity, asks to be removed, \
 or already accepted another job; or
   * the exchange has otherwise reached its natural end.
-- "scheduling": scheduling is still in progress and NOT yet accepted. Choose this when:
+- "scheduling": the candidate is engaged and it is time to move toward booking an \
+interview (this is the default for an interested candidate who is not asking a \
+question and not ending). Choose this when:
   * the candidate asks to schedule or asks about availability; or
-  * the candidate wants to set up a meeting but has not given a final time; or
+  * the candidate has answered the recruiter's questions or shown interest, so the \
+natural next step is to propose an interview; or
   * the candidate declines or rejects an offered slot ("I'm busy then") but is \
 still open to another time.
-- "info": the candidate is asking about the role or company, answering the \
-recruiter's questions, or making general conversation.
+- "info": the candidate is explicitly ASKING a question about the role or company \
+(they want information before moving on).
+
+The bot's goal is to arrange an interview, so prefer "scheduling" for an engaged \
+candidate unless they are clearly asking a question ("info") or ending ("exit").
 
 Respond with ONLY a JSON object:
 {"advisor": "exit" or "scheduling" or "info", "reason": "<one short sentence>"}"""
