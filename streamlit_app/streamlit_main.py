@@ -57,7 +57,8 @@ _OPENER = ("Thanks for applying to our Python Developer opening! "
 
 def _reset() -> None:
     """Clear all conversation state (used by the sidebar reset button)."""
-    for key in ("registered", "agent", "messages", "ended", "candidate_name"):
+    for key in ("registered", "agent", "messages", "ended", "candidate_name",
+                "pending_slots", "scheduled_slot", "slot_choice"):
         st.session_state.pop(key, None)
 
 
@@ -90,6 +91,68 @@ def _register_view() -> None:
         st.rerun()
 
 
+def _confirm_slot(slot: str) -> None:
+    """Record the candidate's chosen interview time and close out the picker.
+
+    Books the slot in the database (available -> 0) so it is never offered to
+    another candidate. If the slot was taken in the meantime, re-query the three
+    nearest available slots and re-offer those instead of confirming.
+    """
+    from app.modules.scheduling_tool import (book_slot, DEFAULT_POSITION,
+                                             get_nearest_available_slots)
+
+    if not book_slot(slot):
+        # The slot was taken between proposal and confirmation. Pull a fresh set
+        # of the nearest available slots (on/after the requested date) so we can
+        # offer real, still-open times rather than the stale proposal.
+        target = slot.split(" at ", 1)[0]  # the date part of "<date> at <time>"
+        fresh = get_nearest_available_slots(target, position=DEFAULT_POSITION, n=3)
+        new_slots = [f"{row['date']} at {row['time']}" for row in fresh]
+        st.session_state.pending_slots = new_slots
+        st.session_state.pop("slot_choice", None)
+        notice = (f"Sorry - the {slot} slot was just taken. "
+                  + ("Here are the next available times - please pick one below."
+                     if new_slots else
+                     "I couldn't find any other open slots right now. Let me know "
+                     "another time that works and I'll check again."))
+        st.session_state.messages.append({"role": "assistant", "content": notice,
+                                          "caption": "action: slot unavailable"})
+        return
+
+    confirmation = (f"You're all set - your Python Developer interview is confirmed "
+                    f"for {slot}. We look forward to speaking with you!")
+    # Keep the conversation coherent for any follow-up turns.
+    st.session_state.agent.memory.add_ai_message(confirmation)
+    st.session_state.messages.append({"role": "assistant", "content": confirmation,
+                                      "caption": "action: scheduled"})
+    st.session_state.scheduled_slot = slot
+    st.session_state.pending_slots = []
+    st.session_state.pop("slot_choice", None)
+
+
+def _render_scheduling_widget() -> None:
+    """Show the interview-time picker while the Scheduling Advisor has proposed slots.
+
+    Rendered alongside the chat input (which stays active), so the candidate can
+    either pick a time here or keep asking questions in the chat.
+    """
+    slots = st.session_state.get("pending_slots") or []
+    if not slots:
+        return
+
+    st.divider()
+    st.subheader("📅 Schedule your interview")
+    st.write("Pick one of the available time slots below and click **Submit Date** "
+             "to confirm. You can also keep chatting if you have other questions.")
+    with st.form("schedule_form"):
+        choice = st.selectbox("Available time slots", slots, key="slot_choice")
+        submitted = st.form_submit_button("Submit Date")
+
+    if submitted:
+        _confirm_slot(choice)
+        st.rerun()
+
+
 def _chat_view() -> None:
     """Show the chat UI and drive one Main Agent turn per candidate message."""
     st.title("🐍 Python Developer - Recruiting Chatbot")
@@ -101,6 +164,9 @@ def _chat_view() -> None:
             st.write(message["content"])
             if message.get("caption"):
                 st.caption(message["caption"])
+
+    # Show the interview-time picker whenever the advisor has proposed slots.
+    _render_scheduling_widget()
 
     if st.session_state.ended:
         st.info("This conversation has ended. Use 'Reset conversation' to start over.")
@@ -130,8 +196,15 @@ def _chat_view() -> None:
 
     st.session_state.messages.append({"role": "assistant", "content": reply,
                                       "caption": caption})
+
     if result["action"] == "end":
         st.session_state.ended = True
+        st.rerun()
+
+    # When the Scheduling Advisor proposes times, surface them as selectable slots.
+    if result["action"] == "schedule":
+        st.session_state.pending_slots = result["advisor_output"].get("slots", [])
+        st.session_state.pop("slot_choice", None)
         st.rerun()
 
 

@@ -38,3 +38,7 @@ CLAUDE_CODE_MASTER_PROMPT.md
 
 # NOTE: data/tech.db (the SQLite scheduling DB) is intentionally NOT ignored.
 # It is committed so recruiter availability is reproducible across clones.
+# Transient SQLite lock/journal sidecar files should not be committed.
+data/tech.db-journal
+data/tech.db-wal
+data/tech.db-shm

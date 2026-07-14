@@ -24,7 +24,9 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from app.modules.advisors.common import get_chat_llm, format_conversation
-from app.modules.scheduling_tool import find_interview_slots
+from app.modules.scheduling_tool import (find_interview_slots, DEFAULT_POSITION,
+                                         resolve_date_expression,
+                                         get_nearest_available_slots)
 from app.prompts.scheduling_advisor import (SCHEDULING_ADVISOR_SYSTEM,
                                             SCHED_PLAN_SYSTEM)
 
@@ -84,6 +86,8 @@ def run_scheduling_advisor(history, reference_date: str = None, llm=None) -> dic
 
     Returns:
         {"should_schedule": bool, "answer": str, "slots": list[str]}
+        ``slots`` is one display string per available slot (for example
+        "2024-04-03 at 09:00:00"), so a UI can offer them as discrete choices.
         should_schedule is True unless the candidate declined or already committed.
     """
     reference_date = reference_date or date.today().isoformat()
@@ -96,11 +100,26 @@ def run_scheduling_advisor(history, reference_date: str = None, llm=None) -> dic
             "slots": [],
         }
 
-    # Propose times using the Phase 3 function-calling tool.
-    slot_str = find_interview_slots.invoke({
-        "date_expression": plan["date_expression"],
-        "reference_date": reference_date,
-    })
-    reply = (f"Let's get your interview booked. {slot_str} "
-             "Which time works best for you?")
-    return {"should_schedule": True, "answer": reply, "slots": [slot_str]}
+    # Resolve the requested timing (via the same Phase 3 logic the tool uses) and
+    # fetch the three nearest available slots as structured rows, so we can return
+    # them both as a human-readable reply and as discrete, selectable options.
+    try:
+        reference = date.fromisoformat(reference_date)
+    except (ValueError, TypeError):
+        reference = date.today()
+    target = resolve_date_expression(plan["date_expression"], reference)
+    slot_rows = get_nearest_available_slots(target, position=DEFAULT_POSITION, n=3)
+    slots = [f"{row['date']} at {row['time']}" for row in slot_rows]
+
+    if not slots:
+        return {
+            "should_schedule": False,
+            "answer": (f"I couldn't find open {DEFAULT_POSITION} interview slots on or "
+                       f"after {target.isoformat()}. Let me know another time that "
+                       "works and I'll check again."),
+            "slots": [],
+        }
+
+    reply = ("Let's get your interview booked. The three nearest available slots are: "
+             f"{'; '.join(slots)}. Which time works best for you?")
+    return {"should_schedule": True, "answer": reply, "slots": slots}

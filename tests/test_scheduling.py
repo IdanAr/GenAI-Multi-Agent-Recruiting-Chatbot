@@ -95,6 +95,61 @@ def test_full_db_row_count(tmp_path):
     assert summary["rows"] == 28188  # 783 valid days x 9 hours x 4 positions
 
 
+# --- booking (write-back) ------------------------------------------------- #
+@pytest.fixture
+def fresh_db(tmp_path):
+    """A fresh, mutable Schedule DB per test (booking writes to it)."""
+    db_path = tmp_path / "book_tech.db"
+    st.build_schedule_db(db_path=db_path, seed=42,
+                         start=date(2024, 4, 1), end=date(2024, 4, 30))
+    return db_path
+
+
+def test_book_slot_marks_unavailable_and_removes_it(fresh_db):
+    slots = st.get_nearest_available_slots(date(2024, 4, 5), db_path=fresh_db)
+    first = slots[0]
+    display = f"{first['date']} at {first['time']}"
+
+    assert st.book_slot(display, db_path=fresh_db) is True
+
+    after = st.get_nearest_available_slots(date(2024, 4, 5), db_path=fresh_db)
+    booked_key = (first["date"], first["time"])
+    assert booked_key not in [(s["date"], s["time"]) for s in after]
+
+
+def test_book_slot_second_time_returns_false(fresh_db):
+    slots = st.get_nearest_available_slots(date(2024, 4, 5), db_path=fresh_db)
+    display = f"{slots[0]['date']} at {slots[0]['time']}"
+
+    assert st.book_slot(display, db_path=fresh_db) is True
+    # Booking the same slot again finds nothing available -> False.
+    assert st.book_slot(display, db_path=fresh_db) is False
+
+
+def test_book_slot_only_affects_python_dev(fresh_db):
+    slots = st.get_nearest_available_slots(date(2024, 4, 5), db_path=fresh_db)
+    first = slots[0]
+    st.book_slot(f"{first['date']} at {first['time']}", db_path=fresh_db)
+
+    # A different position at the same date/time must be untouched.
+    import pandas as pd
+    from sqlalchemy import create_engine, text
+    engine = create_engine(f"sqlite:///{fresh_db.as_posix()}")
+    frame = pd.read_sql(
+        text('SELECT position, available FROM Schedule '
+             'WHERE "date" = :d AND "time" = :t'),
+        engine, params={"d": first["date"], "t": first["time"]})
+    engine.dispose()
+    booked = frame[frame["position"] == "Python Dev"]["available"].iloc[0]
+    assert booked == 0
+    others = frame[frame["position"] != "Python Dev"]["available"].tolist()
+    assert 1 in others  # at least one other position kept its availability
+
+
+def test_book_slot_bad_display_returns_false(fresh_db):
+    assert st.book_slot("not a slot", db_path=fresh_db) is False
+
+
 # --- the LangChain tool --------------------------------------------------- #
 def test_tool_invoke_returns_slots_string():
     result = st.find_interview_slots.invoke(

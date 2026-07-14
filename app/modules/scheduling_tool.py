@@ -41,6 +41,40 @@ _SOONEST_TERMS = {
 }
 
 
+# How long a connection waits for a lock to clear before giving up (ms). SQLite
+# defaults to 0, which is why a brief overlap raises "database is locked".
+_BUSY_TIMEOUT_MS = 30_000
+
+
+def _make_engine(db_path):
+    """Create a SQLite engine that tolerates brief write locks.
+
+    The default SQLite busy timeout is 0, so a connection that finds the database
+    momentarily locked (by the app's own read connection, or an external editor
+    that hasn't committed yet) fails instantly with "database is locked". Setting
+    a busy timeout makes it *wait* for the lock to clear instead - which is what
+    turns a booking write from fragile into reliable.
+
+    The timeout is applied two ways for safety: via sqlite3's ``timeout`` connect
+    arg and via ``PRAGMA busy_timeout`` on every connection. Both are per-
+    connection settings that need no lock themselves, so reads stay cheap.
+    """
+    from sqlalchemy import create_engine, event
+
+    engine = create_engine(
+        f"sqlite:///{db_path.as_posix()}",
+        connect_args={"timeout": _BUSY_TIMEOUT_MS / 1000},  # seconds
+    )
+
+    @event.listens_for(engine, "connect")
+    def _set_busy_timeout(dbapi_conn, _record):  # noqa: ANN001 - SQLAlchemy hook
+        cursor = dbapi_conn.cursor()
+        cursor.execute(f"PRAGMA busy_timeout={_BUSY_TIMEOUT_MS}")
+        cursor.close()
+
+    return engine
+
+
 # --------------------------------------------------------------------------- #
 # 1. Database build
 # --------------------------------------------------------------------------- #
@@ -56,7 +90,6 @@ def build_schedule_db(db_path=config.SQLITE_DB_PATH, seed: int = 42,
     import random
 
     import pandas as pd
-    from sqlalchemy import create_engine
 
     rng = random.Random(seed)
     rows = []
@@ -73,7 +106,7 @@ def build_schedule_db(db_path=config.SQLITE_DB_PATH, seed: int = 42,
     frame.insert(0, "ScheduleID", range(1, len(frame) + 1))
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    engine = create_engine(f"sqlite:///{db_path.as_posix()}")
+    engine = _make_engine(db_path)
     frame.to_sql("Schedule", engine, if_exists="replace", index=False)
     engine.dispose()
 
@@ -140,12 +173,12 @@ def get_nearest_available_slots(target_date, position: str = DEFAULT_POSITION,
     Uses the course SQLAlchemy idiom (create_engine + pd.read_sql + text).
     """
     import pandas as pd
-    from sqlalchemy import create_engine, text
+    from sqlalchemy import text
 
     if isinstance(target_date, date):
         target_date = target_date.isoformat()
 
-    engine = create_engine(f"sqlite:///{db_path.as_posix()}")
+    engine = _make_engine(db_path)
     query = text(
         'SELECT "date", "time", position '
         "FROM Schedule "
@@ -157,6 +190,39 @@ def get_nearest_available_slots(target_date, position: str = DEFAULT_POSITION,
                         params={"position": position, "target": target_date, "n": n})
     engine.dispose()
     return frame.to_dict("records")
+
+
+def book_slot(slot, position: str = DEFAULT_POSITION,
+              db_path=config.SQLITE_DB_PATH) -> bool:
+    """Book a proposed slot: flip its ``available`` flag from 1 to 0.
+
+    Once a candidate confirms an interview time, that slot must never be offered
+    again. ``slot`` is a display string as produced by the scheduling tool /
+    advisor, for example ``"2026-07-17 at 09:00:00"``.
+
+    The UPDATE requires ``available = 1``, so a slot that was already taken
+    (between proposal and confirmation) is not double-booked. Returns True if the
+    slot was available and is now booked, False if it was already taken, not
+    found, or the display string could not be parsed.
+    """
+    from sqlalchemy import text
+
+    try:
+        slot_date, slot_time = (part.strip() for part in str(slot).split(" at ", 1))
+    except ValueError:
+        return False  # not in "<date> at <time>" form
+
+    engine = _make_engine(db_path)
+    with engine.begin() as conn:  # begin() commits on success
+        result = conn.execute(
+            text('UPDATE Schedule SET available = 0 '
+                 'WHERE "date" = :date AND "time" = :time '
+                 "AND position = :position AND available = 1"),
+            {"date": slot_date, "time": slot_time, "position": position},
+        )
+        booked = result.rowcount > 0
+    engine.dispose()
+    return booked
 
 
 # --------------------------------------------------------------------------- #
