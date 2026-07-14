@@ -90,13 +90,18 @@ def decide_action(history, reference_date: str = None, llm=None) -> dict:
                 "advisor": "exit",
                 "advisor_output": exit_out,
             }
-        # Exit advisor vetoed ending -> keep the conversation going via Info.
-        info_out = run_info_advisor(history, llm=llm)
+        # Exit advisor vetoed ending. The candidate is still engaged - often they
+        # named a day ("Wednesday works for me") without a bookable time, which the
+        # router reads as an accept. Hand off to the Scheduling advisor, which
+        # actually checks the DB and proposes real slots, instead of the Info
+        # advisor - the Info advisor has no scheduling data and would hallucinate a
+        # "I'll check availability and get back to you" promise it can't keep.
+        sched_out = run_scheduling_advisor(history, reference_date=reference_date, llm=llm)
         return {
-            "action": "continue",
-            "reply": info_out["answer"],
-            "advisor": "exit",
-            "advisor_output": exit_out,
+            "action": "schedule" if sched_out["should_schedule"] else "continue",
+            "reply": sched_out["answer"],
+            "advisor": "scheduling",
+            "advisor_output": sched_out,
         }
 
     if advisor == "scheduling":

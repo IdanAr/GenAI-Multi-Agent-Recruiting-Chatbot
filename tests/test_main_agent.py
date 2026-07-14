@@ -30,6 +30,33 @@ def test_history_as_turns_maps_memory():
     ]
 
 
+def test_exit_veto_delegates_to_scheduling(monkeypatch):
+    """When the router picks 'exit' but the exit advisor vetoes ending, the turn
+    must hand off to the Scheduling advisor (which checks the DB) - not the Info
+    advisor, which would hallucinate an "I'll check availability" promise.
+    """
+    monkeypatch.setattr(main_agent, "route",
+                        lambda history, llm=None: {"advisor": "exit", "reason": ""})
+    monkeypatch.setattr(main_agent, "run_exit_advisor",
+                        lambda history, llm=None: {"should_end": False,
+                                                   "decision": "continue", "reason": ""})
+    sched_out = {"should_schedule": True, "answer": "Here are three slots ...",
+                 "slots": ["2024-04-05 at 09:00:00", "2024-04-05 at 12:00:00",
+                           "2024-04-05 at 13:00:00"]}
+    monkeypatch.setattr(main_agent, "run_scheduling_advisor",
+                        lambda history, reference_date=None, llm=None: sched_out)
+    # Info advisor must NOT be consulted on the exit-veto path.
+    monkeypatch.setattr(main_agent, "run_info_advisor",
+                        lambda history, llm=None: (_ for _ in ()).throw(
+                            AssertionError("Info advisor should not run on exit-veto")))
+
+    result = main_agent.decide_action([{"speaker": "candidate", "text": "Wednesday works for me"}],
+                                      reference_date="2024-04-03")
+    assert result["action"] == "schedule"
+    assert result["advisor"] == "scheduling"
+    assert result["advisor_output"]["slots"] == sched_out["slots"]
+
+
 @pytest.mark.skipif(not _HAS_KEY, reason="requires OPENAI_API_KEY")
 def test_route_returns_valid_advisor():
     history = [{"speaker": "candidate", "text": "What frameworks would I use?"}]
