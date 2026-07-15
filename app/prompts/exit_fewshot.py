@@ -9,42 +9,60 @@ naive prompt got wrong:
 - the candidate DECLINES one slot but stays engaged -> continue (offer another)
 - the candidate is willing to schedule but not yet booked -> continue
 - the candidate is asking about the role            -> continue
+- the candidate accepts a time but asks a question  -> continue (mixed intent)
 
 No fine-tuning is used; these examples are injected into the prompt only.
 """
 
-EXIT_FEWSHOT = """Example 1
+EXIT_FEWSHOT = """
+# Examples
+
+<example1>
 Conversation:
 Recruiter: No problem. How about Thursday at 4 PM instead?
 Candidate: Monday at 3 PM is good.
 Decision: {"decision": "end", "reason": "The candidate accepted a specific interview time, so the recruiter confirms and the conversation ends."}
+</example1>
 
-Example 2
+<example2>
 Conversation:
 Recruiter: Hybrid work model, with at least two days remote per week. Will you be able to meet next Wednesday at 10 AM?
 Candidate: Wednesday at 10 AM works for me.
 Decision: {"decision": "end", "reason": "The candidate confirmed the proposed time; nothing is left but to confirm and end."}
+</example2>
 
-Example 3
+<example3>
 Conversation:
 Recruiter: Our engineering manager can interview you Wednesday at 10 AM or Thursday at 2 PM. Which works best?
 Candidate: Please remove me from your list. Thanks.
 Decision: {"decision": "end", "reason": "The candidate opted out, so the conversation should end."}
+</example3>
 
-Example 4
+<example4>
 Conversation:
 Recruiter: Our engineering manager can interview you Wednesday at 10 AM or Thursday at 2 PM. Which works best?
 Candidate: I can't at that time, I'm busy.
 Decision: {"decision": "continue", "reason": "The candidate is unavailable for that slot but still engaged; offer another time."}
+</example4>
 
-Example 5
+<example5>
 Conversation:
 Recruiter: We currently deploy to AWS using Docker and ECS.
 Candidate: Sounds great! I'd be happy to schedule a meeting.
 Decision: {"decision": "continue", "reason": "The candidate is ready to schedule but no time is booked yet."}
+</example5>
 
-Example 6
+<example6>
 Conversation:
 Recruiter: How comfortable are you with SQL in addition to Python?
 Candidate: Very comfortable. May I ask what technologies the current stack uses?
-Decision: {"decision": "continue", "reason": "The candidate is asking about the role and remains engaged."}"""
+Decision: {"decision": "continue", "reason": "The candidate is asking about the role and remains engaged."}
+</example6>
+
+<example7>
+Conversation:
+Recruiter: I have openings on Tuesday at 1 PM or 3 PM. Do either work?
+Candidate: Tuesday at 1 PM is perfect. Will this be a technical interview?
+Decision: {"decision": "continue", "reason": "The candidate accepted a time but asked a new question, so the conversation must continue to provide the answer."}
+</example7>
+"""
