@@ -8,12 +8,49 @@ import os
 
 import pytest
 from dotenv import load_dotenv
+from langchain_core.messages import AIMessage
+from langchain_core.runnables import RunnableLambda
 
 from app.modules import main_agent
 from app.modules.main_agent import MainAgent
 
 load_dotenv()
 _HAS_KEY = bool(os.getenv("OPENAI_API_KEY"))
+
+
+def _echo_llm():
+    """A fake LLM (Runnable) that echoes the rendered prompt back as the reply.
+
+    Lets us assert offline that the candidate context reaches the prompt, without
+    calling the real API. Mirrors the taught chain shape: prompt | llm | parser.
+    """
+    return RunnableLambda(lambda prompt_value: AIMessage(content=prompt_value.to_string()))
+
+
+def _raising_llm():
+    """A fake LLM (Runnable) that fails, to exercise the fallback path."""
+    def _boom(_prompt_value):
+        raise RuntimeError("no API available")
+    return RunnableLambda(_boom)
+
+
+def test_compose_opening_uses_name_and_experience():
+    """The greeting prompt must receive the candidate's name and experience."""
+    reply = main_agent.compose_opening("Dana", "3-5", llm=_echo_llm())
+    assert "Dana" in reply
+    assert "3-5" in reply
+
+
+def test_compose_opening_falls_back_when_llm_fails():
+    """Any LLM failure returns the static fallback opener, never an exception."""
+    reply = main_agent.compose_opening("Dana", "3-5", llm=_raising_llm())
+    assert reply == main_agent._FALLBACK_OPENING
+
+
+def test_compose_opening_works_without_candidate_context():
+    """The console has no registration form, so name/experience are optional."""
+    reply = main_agent.compose_opening(llm=_echo_llm())
+    assert isinstance(reply, str) and reply.strip()
 
 
 def test_history_as_turns_maps_memory():

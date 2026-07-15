@@ -11,10 +11,7 @@ Run from the project root:
 from datetime import date
 
 from app.modules import embedding, config
-from app.modules.main_agent import MainAgent
-
-_OPENER = ("Thanks for applying to our Python Developer opening! "
-           "What kinds of Python projects have you worked on recently?")
+from app.modules.main_agent import MainAgent, compose_opening
 
 
 def main() -> None:
@@ -26,9 +23,12 @@ def main() -> None:
         build_schedule_db()
 
     agent = MainAgent(reference_date=date.today().isoformat())
+    # The console has no registration form, so no candidate name/experience:
+    # compose_opening still generates a fresh, agentic greeting (or falls back).
+    opening = compose_opening()
     print("Python Developer Recruiting Chatbot (type 'quit' to exit)\n")
-    print(f"Recruiter: {_OPENER}\n")
-    agent.memory.add_ai_message(_OPENER)
+    print(f"Recruiter: {opening}\n")
+    agent.memory.add_ai_message(opening)
 
     while True:
         try:

@@ -25,11 +25,47 @@ from app.modules.advisors.common import get_chat_llm, format_conversation
 from app.modules.advisors.info_advisor import run_info_advisor
 from app.modules.advisors.scheduling_advisor import run_scheduling_advisor
 from app.modules.advisors.exit_advisor import run_exit_advisor
-from app.prompts.main_agent import MAIN_ROUTER_SYSTEM, MAIN_CLOSING_SYSTEM
+from app.prompts.main_agent import (
+    MAIN_ROUTER_SYSTEM, MAIN_OPENING_SYSTEM, MAIN_CLOSING_SYSTEM,
+)
 
 # Low temperature: routing and closing should be stable.
 _TEMPERATURE = 0.0
 _VALID_ADVISORS = {"exit", "scheduling", "info"}
+
+# Static opener used when the model is unavailable (offline / API error), so the
+# app always has a first message. Single source of truth for the fallback text.
+_FALLBACK_OPENING = ("Thanks for applying to our Python Developer opening! "
+                     "What kinds of Python projects have you worked on recently?")
+
+
+def compose_opening(candidate_name: str = None, experience: str = None, llm=None) -> str:
+    """Write the recruiter's opening greeting for a brand-new conversation.
+
+    Produces a warm, varied welcome plus one opening question about the
+    candidate's Python background, personalized with their name and stated
+    experience when available. The Streamlit registration form supplies both;
+    the console entry point has neither, and the prompt handles the missing
+    values gracefully.
+
+    Temperature 0.7 (vs 0.0 for routing and 0.3 for closing): a greeting should
+    feel natural and not repeat verbatim across candidates. Any failure falls
+    back to the fixed opener so the conversation still starts offline.
+    """
+    llm = llm or get_chat_llm(temperature=0.7)
+    prompt = ChatPromptTemplate.from_messages([
+        SystemMessage(content=MAIN_OPENING_SYSTEM),
+        ("user", "Candidate name: {name}\nStated Python experience: {experience}\n\n"
+                 "Write the opening greeting."),
+    ])
+    chain = prompt | llm | StrOutputParser()
+    try:
+        return chain.invoke({
+            "name": candidate_name or "(not provided)",
+            "experience": experience or "(not provided)",
+        }).strip()
+    except Exception:
+        return _FALLBACK_OPENING
 
 
 def route(history, llm=None) -> dict:
