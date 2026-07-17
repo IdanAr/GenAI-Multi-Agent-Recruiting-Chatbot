@@ -11,6 +11,12 @@ Prompting techniques:
 API parameter: temperature 0 for a stable, repeatable classification.
 """
 
+# The user-turn template. Shared by the live advisor chain and the fine-tuning
+# dataset generator, so a tuned model is trained on the exact text it will be
+# asked with at inference time.
+EXIT_USER_TEMPLATE = "Conversation:\n{input}\n\nReturn only the JSON decision."
+
+
 NAIVE_EXIT_SYSTEM = """You decide whether an SMS recruiting conversation should end.
 Respond with ONLY a JSON object:
 {"decision": "end" or "continue", "reason": "<one short sentence>"}"""

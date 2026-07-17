@@ -25,6 +25,7 @@ data/chroma/
 Thumbs.db
 .vscode/
 .idea/
+.claude/
 
 # --- Course materials & instructions (NOT part of the deliverable) ---
 # 15 MB of lecture content: large binaries (pptx/pdf/mp3/wav), nested .git
@@ -42,3 +43,30 @@ CLAUDE_CODE_MASTER_PROMPT.md
 data/tech.db-journal
 data/tech.db-wal
 data/tech.db-shm
+
+# --- Fine-tuning pipeline (kept local only, not part of the deliverable) ---
+# Prompt engineering was used for the Exit Advisor instead. These files are
+# kept on disk for local reference but are not part of the submitted project.
+app/modules/exit_synthesis.py
+app/modules/exit_dataset.py
+app/modules/exit_eval.py
+app/modules/exit_finetune.py
+app/prompts/exit_eval.py
+tests/test_exit_synthesis.py
+tests/test_exit_dataset.py
+tests/test_exit_eval.py
+tests/test_exit_finetune.py
+data/finetune/
+
+# --- Unit test suite (kept local only; test_evals.ipynb is the required deliverable) ---
+# The brief's "must have" list only requires tests/test_evals.ipynb. These
+# module-level unit tests were built via TDD during development and are kept
+# on disk for local verification, but are not part of the submitted project.
+tests/test_embedding.py
+tests/test_evaluation.py
+tests/test_exit_advisor.py
+tests/test_info_advisor.py
+tests/test_main.py
+tests/test_main_agent.py
+tests/test_scheduling.py
+tests/test_scheduling_advisor.py

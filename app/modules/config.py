@@ -20,7 +20,7 @@ CHROMA_DIR = DATA_DIR / "chroma"            # Chroma persistent vector store.
 SQLITE_DB_PATH = DATA_DIR / "tech.db"       # SQLite scheduling database.
 
 # Model names. Overridable via .env so they can be changed in one place.
-CHAT_MODEL = os.getenv("CHAT_MODEL", "gpt-4o-mini")
+CHAT_MODEL = os.getenv("CHAT_MODEL", "gpt-4.1-2025-04-14")
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
 # Input files used by the app at run time. These are tracked copies of the

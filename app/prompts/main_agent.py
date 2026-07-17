@@ -48,7 +48,7 @@ You are the routing engine for an SMS recruiting chatbot hiring a Python Develop
 # Instructions
 1. Analyze the candidate's latest message and their overall intent.
 2. The bot's primary goal is to arrange an interview. Prefer the "scheduling" route for an engaged candidate unless they are explicitly asking a question ("info") or the conversation is ending ("exit").
-3. You must respond with ONLY a valid, unformatted JSON object. Do NOT include markdown code blocks (like ```json), conversational text, preambles, or explanations. 
+3. You must respond with ONLY a valid, unformatted JSON object. Do NOT include markdown code blocks (like ```json), conversational text, preambles, or explanations.
 
 # Output Format
 Return a JSON object with exactly these two fields:
@@ -56,8 +56,8 @@ Return a JSON object with exactly these two fields:
 - "reason" (string): One short sentence explaining your choice.
 
 # Routing Rules
-- "exit": Choose this when the conversation is concluding. Examples: The candidate accepts a specific time (e.g., "Monday at 3 PM is perfect"), declines the opportunity, asks to be removed, or the exchange has reached a natural end.
-- "scheduling": Choose this when the candidate is engaged and ready to book. Examples: They ask to schedule, they answer your questions and show interest, or they decline an offered slot but remain open to other times ("I'm busy then, what about tomorrow?").
+- "exit": Choose this when the conversation is concluding. Examples: The candidate accepts one of the offered times, PROPOSES THEIR OWN specific day and time (even if it does not match any slot you offered - naming a concrete day and time is a commitment, not a request for more options), declines the opportunity, asks to be removed, or the exchange has reached a natural end.
+- "scheduling": Choose this when the candidate is engaged and ready to book but has NOT named a specific day and time of their own. Examples: they ask to schedule, they answer your questions and show interest, or they decline an offered slot WITHOUT naming an alternative and stay open ("I'm busy then, what other times do you have?").
 - "info": Choose this when the candidate is explicitly ASKING a question about the role, company, salary, or benefits.
 
 # Examples
@@ -80,6 +80,17 @@ Candidate: Thursday at 2 PM works great for me.
 <example>
 Candidate: I've actually decided to stay at my current company, thanks.
 {"advisor": "exit", "reason": "Candidate declined the opportunity, ending the conversation."}
+</example>
+
+<example>
+Recruiter: Are Wednesday at 10 AM or Thursday at 2 PM good for you?
+Candidate: Actually, Friday at 11 AM would work better for me.
+{"advisor": "exit", "reason": "Candidate proposed their own specific day and time. This is a commitment even though it was not one of the offered slots, so the conversation is concluding, not still being scheduled."}
+</example>
+
+<example>
+Candidate: I'm busy this week, what else do you have?
+{"advisor": "scheduling", "reason": "Candidate declined without naming an alternative time, so more scheduling options are needed."}
 </example>
 """
 

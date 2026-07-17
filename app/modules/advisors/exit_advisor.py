@@ -16,7 +16,7 @@ from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
 from app.modules.advisors.common import get_chat_llm, format_conversation
-from app.prompts.exit_advisor import EXIT_ADVISOR_SYSTEM
+from app.prompts.exit_advisor import EXIT_ADVISOR_SYSTEM, EXIT_USER_TEMPLATE
 from app.prompts.exit_fewshot import EXIT_FEWSHOT
 
 # Temperature 0: the exit decision should be stable and repeatable.
@@ -42,7 +42,7 @@ def build_exit_advisor(few_shot_text: str = "", llm=None,
     # is templated (on {input}).
     prompt = ChatPromptTemplate.from_messages([
         SystemMessage(content=system),
-        ("user", "Conversation:\n{input}\n\nReturn only the JSON decision."),
+        ("user", EXIT_USER_TEMPLATE),
     ])
     return prompt | llm | JsonOutputParser()
 
