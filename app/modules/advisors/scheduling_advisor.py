@@ -88,7 +88,10 @@ def run_scheduling_advisor(history, reference_date: str = None, llm=None) -> dic
         {"should_schedule": bool, "answer": str, "slots": list[str]}
         ``slots`` is one display string per available slot (for example
         "2024-04-03 at 09:00:00"), so a UI can offer them as discrete choices.
-        should_schedule is True unless the candidate declined or already committed.
+        should_schedule is True unless the candidate declined. A candidate who
+        accepts or proposes a time still schedules: we re-surface the real
+        available slots so the booking is confirmed from validated options (via
+        the picker), never from unverified free text.
     """
     reference_date = reference_date or date.today().isoformat()
     plan = _plan_scheduling(history, llm=llm)

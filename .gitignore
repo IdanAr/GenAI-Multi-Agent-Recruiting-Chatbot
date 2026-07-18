@@ -25,7 +25,6 @@ data/chroma/
 Thumbs.db
 .vscode/
 .idea/
-.claude/
 
 # --- Course materials & instructions (NOT part of the deliverable) ---
 # 15 MB of lecture content: large binaries (pptx/pdf/mp3/wav), nested .git
@@ -33,30 +32,12 @@ Thumbs.db
 Materials/
 Instructions/
 
-# --- Build-prompt file (kept out of the public repo) ---
-# Remove this line if you want the master prompt included in the repo.
-CLAUDE_CODE_MASTER_PROMPT.md
-
 # NOTE: data/tech.db (the SQLite scheduling DB) is intentionally NOT ignored.
 # It is committed so recruiter availability is reproducible across clones.
 # Transient SQLite lock/journal sidecar files should not be committed.
 data/tech.db-journal
 data/tech.db-wal
 data/tech.db-shm
-
-# --- Fine-tuning pipeline (kept local only, not part of the deliverable) ---
-# Prompt engineering was used for the Exit Advisor instead. These files are
-# kept on disk for local reference but are not part of the submitted project.
-app/modules/exit_synthesis.py
-app/modules/exit_dataset.py
-app/modules/exit_eval.py
-app/modules/exit_finetune.py
-app/prompts/exit_eval.py
-tests/test_exit_synthesis.py
-tests/test_exit_dataset.py
-tests/test_exit_eval.py
-tests/test_exit_finetune.py
-data/finetune/
 
 # --- Unit test suite (kept local only; test_evals.ipynb is the required deliverable) ---
 # The brief's "must have" list only requires tests/test_evals.ipynb. These

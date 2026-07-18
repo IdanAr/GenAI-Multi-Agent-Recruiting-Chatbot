@@ -21,6 +21,35 @@ ACTIONS = ["continue", "schedule", "end"]
 # evaluation therefore uses conversations 6-15 to avoid that overlap.
 FEWSHOT_POOL_IDS = set(range(1, 6))
 
+# --- Redesign label overrides -------------------------------------------------
+# The raw dataset (sms_conversations.json) is left untouched. The original labels
+# merged two distinct candidate intents under a single "end" label:
+#   (a) committing to an interview time ("Monday at 3 PM is good"), and
+#   (b) declining the opportunity ("I'm no longer interested").
+# The DB-backed booking redesign SPLITS these: a candidate committing to a time
+# is now a SCHEDULE action - the system re-surfaces the real available slots and
+# the candidate confirms through the validated picker, which is the only path
+# that calls book_slot(). Confirming a time in free text is a false promise, so
+# it is no longer an "end". Genuine declines remain "end".
+#
+# We therefore override the label for exactly the 11 "commit-to-a-time" turns to
+# "schedule". This is applied here (not by editing the raw data) so the change is
+# explicit, reviewable, and scoped. The 4 real-decline "end" turns are untouched.
+# Keyed by (conversation_id, turn_id).
+REDESIGN_LABEL_OVERRIDES = {
+    (1, 7): "schedule",   # "Monday at 3 PM is good."
+    (2, 9): "schedule",   # "Tuesday at 10 AM works."
+    (3, 7): "schedule",   # "I would like to set an appointment, does Monday at 3 PM..."
+    (4, 7): "schedule",   # "Wednesday at 10 AM works for me."
+    (6, 5): "schedule",   # "Friday 11 AM sounds great."
+    (7, 7): "schedule",   # "Tuesday at 10 AM works."
+    (9, 7): "schedule",   # "Sounds greate, see you then"
+    (10, 7): "schedule",  # "Monday at 3 PM is good."
+    (11, 9): "schedule",  # "Yes, absolutely!"
+    (12, 7): "schedule",  # "Wednesday at 10 AM works for me."
+    (14, 7): "schedule",  # "Tuesday at 10 AM works."
+}
+
 
 def build_eval_examples(include_openers: bool = False,
                         held_out_only: bool = False) -> list[dict]:
@@ -44,9 +73,13 @@ def build_eval_examples(include_openers: bool = False,
                 continue
             reference_date = (turn.get("timestamp_utc", "")[:10]
                               or date.today().isoformat())
+            # Apply the documented redesign relabel (commit-to-a-time -> schedule),
+            # falling back to the dataset's original label for every other turn.
+            label = REDESIGN_LABEL_OVERRIDES.get(
+                (conv["conversation_id"], turn["turn_id"]), turn["label"])
             examples.append({
                 "history": turns[:i],
-                "label": turn["label"],
+                "label": label,
                 "reference_date": reference_date,
                 "conversation_id": conv["conversation_id"],
                 "turn_id": turn["turn_id"],

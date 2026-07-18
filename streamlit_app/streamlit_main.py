@@ -1,4 +1,4 @@
-"""streamlit_main.py - Streamlit proof of concept (Phase 8).
+"""streamlit_main.py - Streamlit proof of concept.
 
 A simple SMS-style chat UI plus a candidate registration form, wired to the
 Main Agent. Each candidate message runs one full turn (route to an advisor,
@@ -25,14 +25,13 @@ from app.modules.main_agent import MainAgent, compose_opening
 
 load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
 
-# On Streamlit Community Cloud there is no .env; the API key is provided through
-# st.secrets. Bridge it into the environment so os.getenv keeps working. (This
-# does not override an existing .env value locally.)
+# On Streamlit Community Cloud there is no .env;
+# The API key is provided through st.secrets. 
 try:
     if "OPENAI_API_KEY" in st.secrets and not os.getenv("OPENAI_API_KEY"):
         os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 except Exception:
-    pass  # no secrets configured (e.g. local run without a secrets file)
+    pass
 
 
 @st.cache_resource(show_spinner="Preparing the knowledge base...")
@@ -165,12 +164,13 @@ def _chat_view() -> None:
             if message.get("caption"):
                 st.caption(message["caption"])
 
-    # Show the interview-time picker whenever the advisor has proposed slots.
-    _render_scheduling_widget()
-
     if st.session_state.ended:
         st.info("This conversation has ended. Use 'Reset conversation' to start over.")
         return
+
+    # Show the interview-time picker whenever the advisor has proposed slots.
+    # (Only while the conversation is active - never after it has ended.)
+    _render_scheduling_widget()
 
     prompt = st.chat_input("Type your message...")
     if not prompt:
@@ -199,6 +199,8 @@ def _chat_view() -> None:
 
     if result["action"] == "end":
         st.session_state.ended = True
+        st.session_state.pending_slots = []  # drop any stale slot picker on end
+        st.session_state.pop("slot_choice", None)
         st.rerun()
 
     # When the Scheduling Advisor proposes times, surface them as selectable slots.
